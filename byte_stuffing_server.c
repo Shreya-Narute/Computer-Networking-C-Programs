@@ -1,5 +1,5 @@
+
 #include <stdio.h>
-#include <string.h>
 #include <unistd.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -12,6 +12,7 @@ int main()
 {
     int serverSocket, clientSocket;
     char frame[200];
+    char data[200];
 
     struct sockaddr_in serverAddress;
 
@@ -19,7 +20,7 @@ int main()
 
     if (serverSocket < 0)
     {
-        perror("Socket creation failed");
+        printf("Socket creation failed\n");
         return 1;
     }
 
@@ -33,14 +34,19 @@ int main()
              (struct sockaddr *)&serverAddress,
              sizeof(serverAddress)) < 0)
     {
-        perror("Binding failed");
+        printf("Binding failed\n");
         close(serverSocket);
         return 1;
     }
 
     printf("Binding successful\n");
 
-    listen(serverSocket, 5);
+    if (listen(serverSocket, 5) < 0)
+    {
+        printf("Listen failed\n");
+        close(serverSocket);
+        return 1;
+    }
 
     printf("Waiting for client...\n");
 
@@ -48,7 +54,7 @@ int main()
 
     if (clientSocket < 0)
     {
-        perror("Accept failed");
+        printf("Accept failed\n");
         close(serverSocket);
         return 1;
     }
@@ -64,23 +70,30 @@ int main()
 
         frame[bytes] = '\0';
 
-        /* Stop condition */
-        if (strcmp(frame, "STOP") == 0)
+        /* Check STOP manually */
+        if (bytes == 4 &&
+            frame[0] == 'S' &&
+            frame[1] == 'T' &&
+            frame[2] == 'O' &&
+            frame[3] == 'P')
+        {
             break;
+        }
 
-        printf("\nReceived Stuffed Frame : %s\n", frame);
+        printf("\nReceived Stuffed Frame: %s\n", frame);
 
-        /* Remove starting and ending FLAG */
         int i;
         int outputIndex = 0;
-        char data[200];
 
+        /* Remove starting FLAG and ending FLAG */
         for (i = 1; i < bytes - 1; i++)
         {
             if (frame[i] == ESCAPE)
             {
                 i++;
-                data[outputIndex++] = frame[i];
+
+                if (i < bytes - 1)
+                    data[outputIndex++] = frame[i];
             }
             else
             {
@@ -90,7 +103,7 @@ int main()
 
         data[outputIndex] = '\0';
 
-        printf("After Destuffing       : %s\n", data);
+        printf("After Destuffing: %s\n", data);
     }
 
     close(clientSocket);
@@ -98,3 +111,4 @@ int main()
 
     return 0;
 }
+
